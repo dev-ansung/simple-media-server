@@ -68,25 +68,24 @@ except ImportError:
             sprite.save(output_path, quality=90)
 
 
-def get_local_ip() -> str:
-    """Get the local network IP, preferring 192.168.x.x or 10.x.x.x ranges."""
+def get_local_ips() -> list[str]:
+    """Get all non-loopback network IPs, preferring 192.168.x.x or 10.x.x.x ranges."""
     try:
         interfaces = socket.getaddrinfo(socket.gethostname(), None)
         ips = []
         for interface in interfaces:
             ip = interface[4][0]
-            if ip != '127.0.0.1':
-                ips.append(ip)
+            # Ignore loopback and IPv6 (which contain colons) for cleaner command-line display
+            if ip != '127.0.0.1' and ':' not in ip:
+                if ip not in ips:
+                    ips.append(ip)
         
-        # Prefer 192.168.x.x or 10.x.x.x (private networks)
-        for ip in ips:
-            if ip.startswith(('192.168.', '10.')):
-                return ip
+        # Sort so that 192.168.x.x or 10.x.x.x are preferred/first
+        ips.sort(key=lambda ip: 0 if ip.startswith(('192.168.', '10.')) else 1)
         
-        # Fallback to first non-loopback IP
-        return ips[0] if ips else "127.0.0.1"
+        return ips if ips else ["127.0.0.1"]
     except Exception:
-        return "127.0.0.1"
+        return ["127.0.0.1"]
 
 
 def check_dependencies():
@@ -327,11 +326,12 @@ def main():
     # Start the Python helper server in background
     helper_server, helper_port = start_helper_server(directory)
 
-    local_ip = get_local_ip()
+    local_ips = get_local_ips()
     print(f"Serving {directory}")
     print()
     print(f"  Local:   http://localhost:{args.port}")
-    print(f"  Network: http://{local_ip}:{args.port}")
+    for ip in local_ips:
+        print(f"  Network: http://{ip}:{args.port}")
     print()
     print("Press Ctrl+C to stop.")
 
