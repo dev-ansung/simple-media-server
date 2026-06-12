@@ -401,8 +401,13 @@ def main():
         caddy_bin = shutil.which("caddy") or "caddy"
         subprocess.run(
             [caddy_bin, "run", "--config", caddyfile_path, "--adapter", "caddyfile"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             check=True,
         )
+    except subprocess.CalledProcessError:
+        print(f"\nError: Caddy failed to start. Is another process already listening on port {args.port}?", file=sys.stderr)
+        print(f"Please check with 'lsof -i :{args.port}' or try a different port with '--port <PORT>'.\n", file=sys.stderr)
     except KeyboardInterrupt:
         print("\nStopping media server...")
     except FileNotFoundError:
