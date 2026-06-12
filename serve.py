@@ -251,32 +251,10 @@ class SpriteRequestHandler(http.server.BaseHTTPRequestHandler):
             sprite_jpg_path = resolved_path
             sprite_json_path = resolved_path.with_suffix(".json")
 
-        # Generate files if they do not exist
+        # Do NOT auto-generate files on request if they do not exist. Return 404 instead.
         if not sprite_json_path.exists() or not sprite_jpg_path.exists():
-            base_name = resolved_path.name.rsplit(".sprites.", 1)[0]
-            video_dir = resolved_path.parent
-            video_exts = ['mp4', 'mkv', 'mov', 'avi', 'webm', 'm4v', 'ts', 'flv']
-            video_path = None
-            for ext in video_exts:
-                candidate = video_dir / f"{base_name}.{ext}"
-                if candidate.exists():
-                    video_path = candidate
-                    break
-
-            if not video_path:
-                self.send_error(404, "Associated video file not found")
-                return
-
-            try:
-                # Use thread-safe generation lock to avoid concurrent processes generating the same sprite
-                with self.server.generation_lock:
-                    if not sprite_json_path.exists() or not sprite_jpg_path.exists():
-                        self.log_message("Generating sprites for %s...", video_path.name)
-                        generate_video_sprites(video_path, sprite_jpg_path)
-            except Exception as e:
-                self.log_message("Error generating sprites: %s", str(e))
-                self.send_error(500, f"Sprite generation failed: {e}")
-                return
+            self.send_error(404, "Sprites not generated yet. Use the manual generation button.")
+            return
 
         # Serve the generated file
         try:
