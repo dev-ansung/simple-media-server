@@ -105,7 +105,7 @@ def check_dependencies():
         print("Please install Caddy server before running this media server:", file=sys.stderr)
         print("  - macOS: brew install caddy", file=sys.stderr)
         print("  - Linux: sudo apt install caddy (Debian/Ubuntu) or equivalent", file=sys.stderr)
-        print("  - Windows: winget install CaddyServer.Caddy or download from https://caddyserver.com", file=sys.stderr)
+        print("  - Windows: choco install caddy or download from https://caddyserver.com", file=sys.stderr)
         sys.exit(1)
 
     # Check ffmpeg and ffprobe
@@ -117,7 +117,7 @@ def check_dependencies():
     if missing:
         print(f"Warning: {', '.join(missing)} not found in PATH.", file=sys.stderr)
         print("On-demand sprite generation will fail without FFmpeg & FFprobe.", file=sys.stderr)
-        print("Please install them using your package manager (e.g. 'brew install ffmpeg' or 'sudo apt install ffmpeg').\n", file=sys.stderr)
+        print("Please install them using your package manager (e.g. 'brew install ffmpeg', 'sudo apt install ffmpeg', or 'choco install ffmpeg').\n", file=sys.stderr)
 
 
 def generate_video_sprites(video_path: Path, output_sprite_path: Path, num_frames=30, width=160, columns=10):

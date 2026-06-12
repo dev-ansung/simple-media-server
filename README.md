@@ -50,8 +50,14 @@ graph TD
 ## Prerequisites
 
 Before running, ensure you have the following installed and available on your system path:
-1. **Caddy**: High-performance web server. [Installation Guide](https://caddyserver.com/docs/install)
-2. **FFmpeg & FFprobe**: Used for video thumbnail generation. [FFmpeg website](https://ffmpeg.org/download.html)
+1. **Caddy**: High-performance web server.
+   - macOS: `brew install caddy`
+   - Linux: `sudo apt install caddy`
+   - Windows: `choco install caddy`
+2. **FFmpeg & FFprobe**: Used for video thumbnail generation.
+   - macOS: `brew install ffmpeg`
+   - Linux: `sudo apt install ffmpeg`
+   - Windows: `choco install ffmpeg`
 3. **Python 3.10+**
 
 ---
