@@ -69,10 +69,22 @@ except ImportError:
 
 
 def get_local_ip() -> str:
+    """Get the local network IP, preferring 192.168.x.x or 10.x.x.x ranges."""
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.connect(("8.8.8.8", 80))
-            return s.getsockname()[0]
+        interfaces = socket.getaddrinfo(socket.gethostname(), None)
+        ips = []
+        for interface in interfaces:
+            ip = interface[4][0]
+            if ip != '127.0.0.1':
+                ips.append(ip)
+        
+        # Prefer 192.168.x.x or 10.x.x.x (private networks)
+        for ip in ips:
+            if ip.startswith(('192.168.', '10.')):
+                return ip
+        
+        # Fallback to first non-loopback IP
+        return ips[0] if ips else "127.0.0.1"
     except Exception:
         return "127.0.0.1"
 
