@@ -1,0 +1,19 @@
+# Python virtual environment & cache
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Tooling and editor configs
+.claude/
+.playwright-mcp/
+.vscode/
+.idea/
+
+# Local media/test files (prevent uploading huge videos)
+videos/
+
+# Caddy temp files and OS files
+.DS_Store
+*.caddyfile

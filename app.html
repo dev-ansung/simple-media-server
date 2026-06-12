@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Media Server</title>
+	<link href="https://vjs.zencdn.net/8.16.1/video-js.css" rel="stylesheet" />
+	<script src="https://vjs.zencdn.net/8.16.1/video.min.js"></script>
+	<script src="https://unpkg.com/videojs-sprite-thumbnails/dist/videojs-sprite-thumbnails.js"></script>
+	<style>
+		*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+		body {
+			background: #111;
+			color: #e0e0e0;
+			font-family: system-ui, sans-serif;
+			display: flex;
+			height: 100vh;
+			overflow: hidden;
+		}
+
+		/* Sidebar */
+		#sidebar {
+			width: 280px;
+			min-width: 200px;
+			max-width: 400px;
+			background: #1a1a1a;
+			border-right: 1px solid #2a2a2a;
+			display: flex;
+			flex-direction: column;
+			overflow: hidden;
+			resize: horizontal;
+		}
+
+		#sidebar-header {
+			padding: 14px 16px;
+			font-size: 13px;
+			font-weight: 600;
+			color: #888;
+			text-transform: uppercase;
+			letter-spacing: 0.08em;
+			border-bottom: 1px solid #2a2a2a;
+			flex-shrink: 0;
+		}
+
+		#file-tree {
+			overflow-y: auto;
+			flex: 1;
+			padding: 8px 0;
+		}
+
+		.dir-item, .file-item {
+			display: flex;
+			align-items: center;
+			gap: 6px;
+			padding: 6px 12px;
+			cursor: pointer;
+			font-size: 13.5px;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			user-select: none;
+		}
+
+		.dir-item:hover, .file-item:hover { background: #252525; }
+		.file-item.active { background: #1e3a5f; color: #7eb8f7; }
+
+		.dir-item .icon { color: #e8c07a; font-size: 14px; flex-shrink: 0; }
+		.file-item .icon { color: #6b9fd4; font-size: 14px; flex-shrink: 0; }
+
+		.dir-children { display: none; }
+		.dir-children.open { display: block; }
+
+		.dir-item .chevron {
+			font-size: 10px;
+			color: #555;
+			margin-right: 2px;
+			transition: transform 0.15s;
+			flex-shrink: 0;
+		}
+		.dir-item.open .chevron { transform: rotate(90deg); }
+
+		.indent { padding-left: 20px; }
+
+		/* Player area */
+		#player-area {
+			flex: 1;
+			display: flex;
+			flex-direction: column;
+			overflow: hidden;
+		}
+
+		#now-playing {
+			padding: 10px 16px;
+			font-size: 13px;
+			color: #666;
+			border-bottom: 1px solid #1e1e1e;
+			flex-shrink: 0;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			gap: 16px;
+		}
+		#playing-text {
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			flex: 1;
+		}
+		#playing-text span { color: #ccc; }
+
+		#gen-sprites-btn {
+			display: none;
+			padding: 6px 12px;
+			font-size: 12px;
+			background: #2a2c30;
+			border: 1px solid #3e4249;
+			color: #e0e0e0;
+			cursor: pointer;
+			border-radius: 4px;
+			font-weight: 600;
+			transition: background 0.2s, border-color 0.2s, color 0.2s;
+			flex-shrink: 0;
+		}
+		#gen-sprites-btn:hover:not(:disabled) {
+			background: #3a3f47;
+			border-color: #505662;
+			color: #ffffff;
+		}
+		#gen-sprites-btn:disabled {
+			opacity: 0.6;
+			cursor: not-allowed;
+		}
+
+		#player-wrapper {
+			flex: 1;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			background: #000;
+			overflow: hidden;
+		}
+
+		#my-video {
+			width: 100% !important;
+			height: 100% !important;
+		}
+
+		#empty-state {
+			text-align: center;
+			color: #444;
+		}
+		#empty-state .big { font-size: 48px; margin-bottom: 12px; }
+		#empty-state p { font-size: 14px; }
+	</style>
+</head>
+<body>
+
+<div id="sidebar">
+	<div id="sidebar-header">Files</div>
+	<div id="file-tree"><div style="padding:12px 16px;color:#555;font-size:13px;">Loading…</div></div>
+</div>
+
+<div id="player-area">
+	<div id="now-playing">
+		<div id="playing-text">Nothing playing</div>
+		<button id="gen-sprites-btn">Generate Thumbnails</button>
+	</div>
+	<div id="player-wrapper">
+		<div id="empty-state">
+			<div class="big">▶</div>
+			<p>Select a video from the sidebar</p>
+		</div>
+		<video id="my-video" class="video-js vjs-default-skin vjs-big-play-centered" controls preload="auto" style="display:none"></video>
+	</div>
+</div>
+
+<script>
+const VIDEO_EXTS = new Set(['mp4','mkv','mov','avi','webm','m4v','ts','flv']);
+const isVideo = name => VIDEO_EXTS.has(name.split('.').pop().toLowerCase());
+
+let player = null;
+let currentVideoPath = null;
+
+function initPlayer() {
+	if (player) {
+		player.dispose();
+		player = null;
+	}
+	const wrapper = document.getElementById('player-wrapper');
+	wrapper.innerHTML = '';
+	
+	const vid = document.createElement('video');
+	vid.id = 'my-video';
+	vid.className = 'video-js vjs-default-skin vjs-big-play-centered';
+	vid.controls = true;
+	vid.preload = 'auto';
+	vid.style.width = '100%';
+	vid.style.height = '100%';
+	wrapper.appendChild(vid);
+	
+	player = videojs('my-video', { fluid: false });
+}
+
+async function loadDir(path) {
+	const url = '/_ls' + (path.endsWith('/') ? path : path + '/');
+	const res = await fetch(url, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
+	if (!res.ok) return [];
+	return res.json();
+}
+
+function playVideo(path, name) {
+	initPlayer();
+	currentVideoPath = path;
+
+	document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
+	document.querySelector(`[data-path="${CSS.escape(path)}"]`)?.classList.add('active');
+
+	document.getElementById('playing-text').innerHTML = `Playing: <span>${name}</span>`;
+	
+	const btn = document.getElementById('gen-sprites-btn');
+	btn.style.display = 'block';
+	btn.disabled = false;
+	btn.innerText = 'Generate Thumbnails';
+
+	player.src({ src: path, type: 'video/mp4' });
+	player.play();
+
+	// Load sprite thumbnails if a JSON config exists alongside the video
+	const jsonPath = path.replace(/\.[^.]+$/, '.sprites.json');
+	fetch(jsonPath).then(r => {
+		if (r.ok) return r.json();
+		throw new Error('no sprites');
+	}).then(config => {
+		player.spriteThumbnails(config);
+		btn.innerText = 'Regenerate Thumbnails';
+	}).catch(() => {
+		// Reset/Clear thumbnails by calling with empty/default config
+		player.spriteThumbnails({ url: '', width: 0, height: 0 });
+	});
+}
+
+// Hook up the manual generation button
+document.getElementById('gen-sprites-btn').addEventListener('click', async () => {
+	if (!currentVideoPath) return;
+	const btn = document.getElementById('gen-sprites-btn');
+	btn.disabled = true;
+	btn.innerText = 'Generating…';
+	try {
+		const res = await fetch('/_generate' + currentVideoPath);
+		if (res.ok) {
+			const config = await res.json();
+			
+			// Capture current playback state
+			const currentTime = player.currentTime();
+			const wasPlaying = !player.paused();
+			
+			// Reload the video source
+			player.src({ src: currentVideoPath, type: 'video/mp4' });
+			
+			// Restore timestamp and play state once metadata is loaded
+			player.one('loadedmetadata', () => {
+				player.currentTime(currentTime);
+				player.spriteThumbnails(config);
+				if (wasPlaying) {
+					player.play();
+				}
+			});
+
+			btn.innerText = 'Done!';
+			setTimeout(() => {
+				btn.innerText = 'Regenerate Thumbnails';
+				btn.disabled = false;
+			}, 2000);
+		} else {
+			throw new Error('Failed to generate sprites');
+		}
+	} catch (e) {
+		console.error(e);
+		btn.innerText = 'Failed';
+		setTimeout(() => {
+			btn.innerText = 'Generate Thumbnails';
+			btn.disabled = false;
+		}, 3000);
+	}
+});
+
+// dirPath is the media path (e.g. "/" or "/subdir") — used for both browse and playback
+async function buildTree(dirPath, container, depth = 0) {
+	const entries = await loadDir(dirPath);
+	container.innerHTML = '';
+	if (!entries || entries.length === 0) {
+		container.innerHTML = '<div style="padding:8px 16px;color:#555;font-size:13px;">Empty</div>';
+		return;
+	}
+
+	entries.sort((a, b) => {
+		if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
+		return a.name.localeCompare(b.name);
+	});
+
+	for (const entry of entries) {
+		const name = entry.name.replace(/\/$/, '');
+		const entryIsDir = entry.is_dir;
+		const entryMediaPath = dirPath.replace(/\/$/, '') + '/' + name;
+
+		if (entryIsDir) {
+			const wrapper = document.createElement('div');
+
+			const dirEl = document.createElement('div');
+			dirEl.className = 'dir-item';
+			dirEl.style.paddingLeft = (12 + depth * 16) + 'px';
+			dirEl.innerHTML = `<span class="chevron">▶</span><span class="icon">📁</span><span>${name}</span>`;
+
+			const children = document.createElement('div');
+			children.className = 'dir-children';
+
+			let loaded = false;
+			dirEl.addEventListener('click', async () => {
+				const isOpen = children.classList.toggle('open');
+				dirEl.classList.toggle('open', isOpen);
+				if (isOpen && !loaded) {
+					loaded = true;
+					children.innerHTML = '<div style="padding:6px 16px;color:#555;font-size:12px;">Loading…</div>';
+					await buildTree(entryMediaPath, children, depth + 1);
+				}
+			});
+
+			wrapper.appendChild(dirEl);
+			wrapper.appendChild(children);
+			container.appendChild(wrapper);
+
+		} else if (isVideo(name)) {
+			const fileEl = document.createElement('div');
+			fileEl.className = 'file-item';
+			fileEl.dataset.path = entryMediaPath;
+			fileEl.style.paddingLeft = (12 + depth * 16) + 'px';
+			fileEl.innerHTML = `<span class="icon">🎬</span><span title="${name}">${name}</span>`;
+			fileEl.addEventListener('click', () => playVideo(entryMediaPath, name));
+			container.appendChild(fileEl);
+		}
+	}
+}
+
+// Bootstrap: load root
+buildTree('/', document.getElementById('file-tree'));
+</script>
+</body>
+</html>
